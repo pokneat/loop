@@ -1,0 +1,142 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
+
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users     User[]
+  feedback  Feedback[]
+  themes    Theme[]
+  reports   Report[]
+}
+
+enum Role {
+  ADMIN
+  ANALYST
+  VIEWER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(VIEWER)
+
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id])
+
+  reports      Report[] @relation("ReportGeneratedBy")
+
+  createdAt    DateTime @default(now())
+
+  @@index([workspaceId])
+}
+
+enum Sentiment {
+  POS
+  NEU
+  NEG
+}
+
+enum FeedbackStatus {
+  NEW
+  REVIEWED
+  ACTIONED
+}
+
+enum Channel {
+  MANUAL
+  CSV
+  SIMULATED_API
+}
+
+model Feedback {
+  id             String          @id @default(cuid())
+  content        String
+  channel        Channel
+  sourceRef      String?
+  customerLabel  String?
+
+  sentiment      Sentiment?
+  sentimentScore Float?          // -1.0 .. 1.0, validate at Zod layer
+
+  status         FeedbackStatus  @default(NEW)
+  createdAt      DateTime        @default(now())
+
+  workspaceId    String
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id])
+
+  themes         FeedbackTheme[]
+  embedding      Embedding?
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
+}
+
+model Theme {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  color       String?
+
+  workspaceId String
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id])
+
+  feedback    FeedbackTheme[]
+
+  @@index([workspaceId])
+}
+
+model FeedbackTheme {
+  feedbackId String
+  feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  themeId    String
+  theme      Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
+
+  confidence Float    // 0.0 .. 1.0
+
+  @@id([feedbackId, themeId])
+}
+
+model Embedding {
+  id         String   @id @default(cuid())
+
+  feedbackId String   @unique
+  feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  vector     Unsupported("vector(1536)")? // pgvector — adjust dimension to your embedding model
+
+  @@index([feedbackId])
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  title       String
+  periodStart DateTime
+  periodEnd   DateTime
+  contentJson Json
+  createdAt   DateTime @default(now())
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  generatedById String
+  generatedBy   User    @relation("ReportGeneratedBy", fields: [generatedById], references: [id])
+
+  @@index([workspaceId])
+}
+  
