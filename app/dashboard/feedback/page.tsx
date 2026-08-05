@@ -86,6 +86,47 @@ export default function FeedbackInboxPage() {
     e.target.value = '' // reset file input so the same file can be re-selected later
   }
 }
+async function handleStatusChange(id: string, newStatus: FeedbackItem['status']) {
+  // optimistic update — reflect the change immediately in the UI
+  setItems((prev) =>
+    prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
+  )
+
+  try {
+    const res = await fetch(`/api/feedback/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    })
+
+    if (!res.ok) {
+      // revert on failure by refetching real data
+      fetchFeedback()
+    }
+  } catch {
+    fetchFeedback()
+  }
+}
+async function handleSimulateChannel() {
+  setUploading(true)
+  setUploadMessage(null)
+
+  try {
+    const res = await fetch('/api/channels/simulate', { method: 'POST' })
+    const json = await res.json()
+
+    if (!res.ok) {
+      setUploadMessage(`Error: ${json.error?.message ?? 'Simulation failed.'}`)
+    } else {
+      setUploadMessage(json.message)
+      fetchFeedback()
+    }
+  } catch {
+    setUploadMessage('Could not reach the server.')
+  } finally {
+    setUploading(false)
+  }
+}
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 400)
@@ -145,6 +186,13 @@ export default function FeedbackInboxPage() {
           disabled={uploading}
         />
       </label>
+      <button
+          onClick={handleSimulateChannel}
+          disabled={uploading}
+          className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm hover:bg-purple-700 disabled:opacity-50"
+        >
+          {uploading ? 'Working...' : 'Simulate Channel'}
+      </button>
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
@@ -219,10 +267,16 @@ export default function FeedbackInboxPage() {
                       {item.sentiment ?? '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[item.status]}`}>
-                        {item.status}
-                      </span>
-                    </td>
+                    <select
+                      value={item.status}
+                      onChange={(e) => handleStatusChange(item.id, e.target.value as FeedbackItem['status'])}
+                      className={`px-2 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${STATUS_STYLES[item.status]}`}
+                    >
+                      <option value="NEW">NEW</option>
+                      <option value="REVIEWED">REVIEWED</option>
+                      <option value="ACTIONED">ACTIONED</option>
+                    </select>
+                  </td>
                     <td className="px-4 py-3 text-gray-500">
                       {new Date(item.createdAt).toLocaleDateString()}
                     </td>
