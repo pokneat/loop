@@ -72,6 +72,9 @@ model Feedback {
 
   sentiment      Sentiment?
   sentimentScore Float?          // -1.0 .. 1.0, validate at Zod layer
+  featureArea    String?         // short label from AI1, e.g. "Performance", "Pricing"
+  themeTags      String[]        @default([]) // lightweight tags from AI1; AI2 reconciles into real Theme rows
+  classifiedAt   DateTime?       // set once classification succeeds; null = needs classification
 
   status         FeedbackStatus  @default(NEW)
   createdAt      DateTime        @default(now())

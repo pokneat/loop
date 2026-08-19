@@ -9,7 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google/genai": "^2.17.1",
     "bcryptjs": "^3.0.3",
+    "geni": "^0.1.2",
     "next": "16.2.11",
     "next-auth": "^5.0.0-beta.32",
     "papaparse": "^5.5.4",
