@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
   if (!session?.user) {
@@ -17,7 +17,7 @@ export async function GET(
   try {
     const report = await prisma.report.findFirst({
       where: {
-        id: params.id,
+        id: (await params).id,
         workspaceId: session.user.workspaceId, // tenant-scoped — 404, not 403, for cross-tenant
       },
     })
