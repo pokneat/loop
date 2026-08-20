@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         periodEnd,
         contentJson: content as any,
         workspaceId: session.user.workspaceId,
-        generatedById: session.user.id,
+        generatedById: session.user.id as string,
       },
     })
 
