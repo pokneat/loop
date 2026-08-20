@@ -109,7 +109,7 @@ export default function AnalyticsPage() {
                 cx="50%"
                 cy="50%"
                 outerRadius={80}
-                label={(entry) => `${entry.status}: ${entry.count}`}
+                label={(entry: any) => `${entry.status}: ${entry.count}`}
               >
                 {data.statusBreakdown.map((entry) => (
                   <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? '#9CA3AF'} />
@@ -132,7 +132,7 @@ export default function AnalyticsPage() {
                 cx="50%"
                 cy="50%"
                 outerRadius={80}
-                label={(entry) => `${entry.sentiment}: ${entry.count}`}
+                label={(entry: any ) => `${entry.sentiment}: ${entry.count}`}
               >
                 {data.sentimentBreakdown.map((entry) => (
                   <Cell key={entry.sentiment} fill={SENTIMENT_COLORS[entry.sentiment] ?? '#9CA3AF'} />
