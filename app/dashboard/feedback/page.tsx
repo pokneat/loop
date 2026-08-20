@@ -46,6 +46,7 @@ export default function FeedbackInboxPage() {
   const [items, setItems] = useState<FeedbackItem[]>([])
   const [pagination, setPagination] = useState<ApiResponse['pagination'] | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [search, setSearch] = useState('')
@@ -57,76 +58,79 @@ export default function FeedbackInboxPage() {
   const [uploadMessage, setUploadMessage] = useState<string | null>(null)
 
   async function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
-  const file = e.target.files?.[0]
-  if (!file) return
+    const file = e.target.files?.[0]
+    if (!file) return
 
-  setUploading(true)
-  setUploadMessage(null)
+    setUploading(true)
+    setUploadMessage(null)
 
-  const formData = new FormData()
-  formData.append('file', file)
+    const formData = new FormData()
+    formData.append('file', file)
 
-  try {
-    const res = await fetch('/api/feedback/bulk', {
-      method: 'POST',
-      body: formData,
-    })
-    const json = await res.json()
+    try {
+      const res = await fetch('/api/feedback/bulk', {
+        method: 'POST',
+        body: formData,
+      })
+      const json = await res.json()
 
-    if (!res.ok) {
-      setUploadMessage(`Error: ${json.error?.message ?? 'Upload failed.'}`)
-    } else {
-      setUploadMessage(`Imported ${json.imported} rows${json.skipped ? `, skipped ${json.skipped}` : ''}.`)
-      fetchFeedback() // refresh the table
+      if (!res.ok) {
+        setUploadMessage(`Error: ${json.error?.message ?? 'Upload failed.'}`)
+      } else {
+        setUploadMessage(`Imported ${json.imported} rows${json.skipped ? `, skipped ${json.skipped}` : ''}.`)
+        fetchFeedback()
+      }
+    } catch {
+      setUploadMessage('Could not reach the server.')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
     }
-  } catch {
-    setUploadMessage('Could not reach the server.')
-  } finally {
-    setUploading(false)
-    e.target.value = '' // reset file input so the same file can be re-selected later
   }
-}
-async function handleStatusChange(id: string, newStatus: FeedbackItem['status']) {
-  // optimistic update — reflect the change immediately in the UI
-  setItems((prev) =>
-    prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
-  )
 
-  try {
-    const res = await fetch(`/api/feedback/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    })
+  async function handleStatusChange(id: string, newStatus: FeedbackItem['status']) {
+    const previousItems = items
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
+    )
 
-    if (!res.ok) {
-      // revert on failure by refetching real data
-      fetchFeedback()
+    try {
+      const res = await fetch(`/api/feedback/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (!res.ok) {
+        setItems(previousItems)
+        setUploadMessage('Error: Could not update status. Please try again.')
+      }
+    } catch {
+      setItems(previousItems)
+      setUploadMessage('Error: Could not reach the server.')
     }
-  } catch {
-    fetchFeedback()
   }
-}
-async function handleSimulateChannel() {
-  setUploading(true)
-  setUploadMessage(null)
 
-  try {
-    const res = await fetch('/api/channels/simulate', { method: 'POST' })
-    const json = await res.json()
+  async function handleSimulateChannel() {
+    setUploading(true)
+    setUploadMessage(null)
 
-    if (!res.ok) {
-      setUploadMessage(`Error: ${json.error?.message ?? 'Simulation failed.'}`)
-    } else {
-      setUploadMessage(json.message)
-      fetchFeedback()
+    try {
+      const res = await fetch('/api/channels/simulate', { method: 'POST' })
+      const json = await res.json()
+
+      if (!res.ok) {
+        setUploadMessage(`Error: ${json.error?.message ?? 'Simulation failed.'}`)
+      } else {
+        setUploadMessage(json.message)
+        fetchFeedback()
+      }
+    } catch {
+      setUploadMessage('Could not reach the server.')
+    } finally {
+      setUploading(false)
     }
-  } catch {
-    setUploadMessage('Could not reach the server.')
-  } finally {
-    setUploading(false)
   }
-}
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 400)
@@ -152,6 +156,10 @@ async function handleSimulateChannel() {
       const json = await res.json()
 
       if (!res.ok) {
+        if (res.status === 401) {
+          window.location.href = '/login'
+          return
+        }
         setError(json.error?.message ?? 'Something went wrong.')
         setItems([])
         setPagination(null)
@@ -164,6 +172,7 @@ async function handleSimulateChannel() {
       setError('Could not reach the server. Check your connection and try again.')
     } finally {
       setLoading(false)
+      setIsInitialLoad(false)
     }
   }, [status, debouncedSearch, page])
 
@@ -175,27 +184,36 @@ async function handleSimulateChannel() {
     <div className="max-w-5xl mx-auto py-10 px-4">
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Feedback Inbox</h1>
 
-      <div className="flex gap-3 mb-6">
-      <label className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm cursor-pointer hover:bg-gray-800">
-        {uploading ? 'Uploading...' : 'Upload CSV'}
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleCsvUpload}
-          className="hidden"
-          disabled={uploading}
-        />
-      </label>
-      <button
+      <div className="flex flex-wrap gap-3 mb-6">
+        <label className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm cursor-pointer hover:bg-gray-800">
+          {uploading ? 'Uploading...' : 'Upload CSV'}
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleCsvUpload}
+            className="hidden"
+            disabled={uploading}
+          />
+        </label>
+        <button
           onClick={handleSimulateChannel}
           disabled={uploading}
           className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm hover:bg-purple-700 disabled:opacity-50"
         >
           {uploading ? 'Working...' : 'Simulate Channel'}
-      </button>
+        </button>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search feedback..."
+          aria-label="Search feedback"
+          className="px-3 py-2 border border-gray-300 rounded-md text-sm flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
+          aria-label="Filter by status"
           className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">All statuses</option>
@@ -204,32 +222,35 @@ async function handleSimulateChannel() {
           <option value="ACTIONED">Actioned</option>
         </select>
       </div>
+
       {uploadMessage && (
         <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md mb-4">
           {uploadMessage}
         </div>
       )}
-      
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
           {error}
         </div>
       )}
 
-      {loading && (
+      {loading && isInitialLoad && (
         <div className="text-center py-16 text-gray-500">Loading feedback...</div>
       )}
 
-      {!loading && !error && items.length === 0 && (
+      {!isInitialLoad && !error && items.length === 0 && !loading && (
         <div className="text-center py-16 text-gray-500">
-          No feedback found. Try adjusting your search or filters.
+          {search || status
+            ? 'No feedback matches your filters.'
+            : 'No feedback yet. Upload a CSV or simulate a channel to get started.'}
         </div>
       )}
 
-      {!loading && !error && items.length > 0 && (
-        <>
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+      {!isInitialLoad && items.length > 0 && (
+        <div className={loading ? 'opacity-50 transition-opacity' : ''}>
+          <div className="border border-gray-200 rounded-lg overflow-hidden overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-gray-50 text-left text-gray-500">
                 <tr>
                   <th className="px-4 py-3 font-medium">Content</th>
@@ -267,16 +288,17 @@ async function handleSimulateChannel() {
                       {item.sentiment ?? '—'}
                     </td>
                     <td className="px-4 py-3">
-                    <select
-                      value={item.status}
-                      onChange={(e) => handleStatusChange(item.id, e.target.value as FeedbackItem['status'])}
-                      className={`px-2 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${STATUS_STYLES[item.status]}`}
-                    >
-                      <option value="NEW">NEW</option>
-                      <option value="REVIEWED">REVIEWED</option>
-                      <option value="ACTIONED">ACTIONED</option>
-                    </select>
-                  </td>
+                      <select
+                        aria-label={`Change status for feedback: ${item.content.slice(0, 40)}`}
+                        value={item.status}
+                        onChange={(e) => handleStatusChange(item.id, e.target.value as FeedbackItem['status'])}
+                        className={`px-2 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${STATUS_STYLES[item.status]}`}
+                      >
+                        <option value="NEW">NEW</option>
+                        <option value="REVIEWED">REVIEWED</option>
+                        <option value="ACTIONED">ACTIONED</option>
+                      </select>
+                    </td>
                     <td className="px-4 py-3 text-gray-500">
                       {new Date(item.createdAt).toLocaleDateString()}
                     </td>
@@ -309,7 +331,7 @@ async function handleSimulateChannel() {
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )

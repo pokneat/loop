@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.17.1",
+    "@react-pdf/renderer": "^4.6.1",
     "bcryptjs": "^3.0.3",
     "geni": "^0.1.2",
     "next": "16.2.11",

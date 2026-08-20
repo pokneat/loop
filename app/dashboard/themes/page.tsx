@@ -82,11 +82,11 @@ export default async function ThemesPage() {
           const barWidth = Math.max((theme.currentCount / maxCount) * 100, theme.currentCount > 0 ? 4 : 0)
 
           return (
-            <Link
+          <Link
               key={theme.id}
               href={`/dashboard/feedback?themeId=${theme.id}`}
-              className="group flex items-center gap-4 rounded-lg border border-gray-200 bg-white px-5 py-4 hover:border-gray-300 hover:shadow-sm transition"
-            >
+              className="group flex items-center gap-3 sm:gap-4 rounded-lg border border-gray-200 bg-white px-4 sm:px-5 py-4 hover:border-gray-300 hover:shadow-sm transition"
+          >
               <span
                 className="h-3 w-3 shrink-0 rounded-full"
                 style={{ backgroundColor: theme.color ?? '#9CA3AF' }}
@@ -102,7 +102,14 @@ export default async function ThemesPage() {
                     </span>
                   )}
                 </div>
-                <div className="mt-2 h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className="mt-2 h-1.5 w-full rounded-full bg-gray-100 overflow-hidden"
+                  role="progressbar"
+                  aria-valuenow={theme.currentCount}
+                  aria-valuemin={0}
+                  aria-valuemax={maxCount}
+                  aria-label={`${theme.name}: ${theme.currentCount} feedback items`}
+                >
                   <div
                     className="h-full rounded-full transition-all"
                     style={{ width: `${barWidth}%`, backgroundColor: theme.color ?? '#9CA3AF' }}
