@@ -14,6 +14,7 @@ interface ReportSummary {
 export default function ReportsPage() {
   const [reports, setReports] = useState<ReportSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
 
@@ -25,10 +26,23 @@ export default function ReportsPage() {
 
   async function loadReports() {
     setLoading(true)
+    setLoadError('')
     try {
       const res = await fetch('/api/reports')
       const json = await res.json()
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          window.location.href = '/login'
+          return
+        }
+        setLoadError(json.error?.message ?? 'Failed to load reports.')
+        return
+      }
+
       setReports(json.data ?? [])
+    } catch {
+      setLoadError('Could not reach the server. Check your connection and try again.')
     } finally {
       setLoading(false)
     }
@@ -53,6 +67,10 @@ export default function ReportsPage() {
       })
       const json = await res.json()
       if (!res.ok) {
+        if (res.status === 401) {
+          window.location.href = '/login'
+          return
+        }
         setError(json.error?.message ?? 'Failed to generate report.')
         return
       }
@@ -75,8 +93,9 @@ export default function ReportsPage() {
         <p className="text-sm font-medium text-gray-700 mb-3">Generate a new report</p>
         <div className="flex items-end gap-3 flex-wrap">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">From</label>
+            <label htmlFor="periodStart" className="block text-xs text-gray-500 mb-1">From</label>
             <input
+              id="periodStart"
               type="date"
               value={periodStart}
               onChange={(e) => setPeriodStart(e.target.value)}
@@ -85,8 +104,9 @@ export default function ReportsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">To</label>
+            <label htmlFor="periodEnd" className="block text-xs text-gray-500 mb-1">To</label>
             <input
+              id="periodEnd"
               type="date"
               value={periodEnd}
               onChange={(e) => setPeriodEnd(e.target.value)}
@@ -109,10 +129,16 @@ export default function ReportsPage() {
         {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
       </form>
 
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">
+          {loadError}
+        </div>
+      )}
+
       <div className="space-y-2">
         {loading ? (
           <p className="text-sm text-gray-400">Loading reports…</p>
-        ) : reports.length === 0 ? (
+        ) : loadError ? null : reports.length === 0 ? (
           <p className="text-sm text-gray-400">No reports yet. Generate your first one above.</p>
         ) : (
           reports.map((r) => (
@@ -136,4 +162,4 @@ export default function ReportsPage() {
       </div>
     </div>
   )
-} 
+}
