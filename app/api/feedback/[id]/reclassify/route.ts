@@ -6,7 +6,7 @@ import { assignTheme } from '@/lib/ai/assignTheme'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // 1. Auth check
   const session = await auth()
@@ -25,7 +25,7 @@ export async function PATCH(
     )
   }
 
-  const { id } = params
+  const { id } = await params
 
   try {
     // 3. Tenant-scoped lookup — 404, not 403, if it belongs to another workspace
@@ -58,23 +58,14 @@ export async function PATCH(
         },
       })
 
-        // AI2: re-assign theme too, since content/tags may have changed classification
-  await assignTheme(
-    updated.id,
-    updated.content,
-    updated.featureArea,
-    updated.themeTags,
-    session.user.workspaceId
-  )
-
-  return NextResponse.json({ data: updated })
-} catch (classifyErr) {
-  console.error('Re-classification failed for feedback', existing.id, classifyErr)
-  return NextResponse.json(
-    { error: { code: 'CLASSIFICATION_FAILED', message: 'Re-classification failed. Please try again.' } },
-    { status: 502 }
-  )
-}
+      // AI2: re-assign theme too, since content/tags may have changed classification
+      await assignTheme(
+        updated.id,
+        updated.content,
+        updated.featureArea,
+        updated.themeTags,
+        session.user.workspaceId
+      )
 
       return NextResponse.json({ data: updated })
     } catch (classifyErr) {
